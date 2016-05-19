@@ -15,15 +15,19 @@ import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
 public class MainActivity extends AppCompatActivity implements
-        GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+        GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
 
     private final static String TAG = "MainActivity";
 
     private TextView latLongView;
     private GoogleApiClient googleApiClient;
+    private LocationRequest locationRequest;
+    private boolean requestingLocationUpdate;
 
     private final static String[] PERMISSIONS = {
             Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -43,6 +47,11 @@ public class MainActivity extends AppCompatActivity implements
                 .addOnConnectionFailedListener(this)
                 .addApi(LocationServices.API)
                 .build();
+
+        locationRequest = new LocationRequest();
+        locationRequest.setInterval(10000);
+        locationRequest.setFastestInterval(5000);
+        locationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
     }
 
     @Override
@@ -53,17 +62,41 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     @Override
+    protected void onRestart() {
+        super.onRestart();
+        Log.d(TAG, "onRestart");
+    }
+
+    @Override
+    protected void onResume() {
+        Log.d(TAG, "onResume");
+        super.onResume();
+        if (googleApiClient.isConnected())
+            startLocationUpdate(true);
+        else
+            requestingLocationUpdate = true;
+    }
+
+    @Override
+    protected void onPause() {
+        Log.d(TAG, "onPause");
+        stopLocationUpdate();
+        requestingLocationUpdate = false;
+        super.onPause();
+    }
+
+    @Override
     protected void onStop() {
         Log.d(TAG, "onStop");
         googleApiClient.disconnect();
         super.onStop();
     }
 
-
     @Override
     public void onConnected(@Nullable Bundle bundle) {
         Log.d(TAG, "onConnected");
-        showLastLocation(true);
+        if (requestingLocationUpdate)
+            startLocationUpdate(true);
     }
 
     @Override
@@ -77,17 +110,23 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     @Override
+    public void onLocationChanged(Location location) {
+        Log.d(TAG, "onLocationChanged");
+        displayLocation(location);
+    }
+
+    @Override
     public void onRequestPermissionsResult(int reqCode,
                                            @NonNull String[] permissions, @NonNull int[] grants) {
         Log.d(TAG, "onRequestPermissionsResult");
         switch (reqCode) {
         case REQCODE_PERMISSIONS:
-            showLastLocation(false);
+            startLocationUpdate(false);
             break;
         }
     }
 
-    private void showLastLocation(boolean reqPermission) {
+    private void startLocationUpdate(boolean reqPermission) {
         for (String permission : PERMISSIONS) {
             if (ContextCompat.checkSelfPermission(this, permission)
                     != PackageManager.PERMISSION_GRANTED) {
@@ -99,13 +138,16 @@ public class MainActivity extends AppCompatActivity implements
                 return;
             }
         }
-        Location loc = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
-        if (loc != null)
-            displayLocation(loc);
+        LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient, locationRequest, this);
+    }
+
+    private void stopLocationUpdate() {
+        LocationServices.FusedLocationApi.removeLocationUpdates(googleApiClient, this);
     }
 
     private void displayLocation(Location loc) {
         latLongView.setText(getString(R.string.latlong_format,
                 loc.getLatitude(), loc.getLongitude()));
     }
+
 }
