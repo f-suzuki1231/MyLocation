@@ -85,7 +85,6 @@ public class MainActivity extends AppCompatActivity implements
             showLastLocation(false);
             break;
         }
-
     }
 
     private void showLastLocation(boolean reqPermission) {
@@ -102,7 +101,11 @@ public class MainActivity extends AppCompatActivity implements
         }
         Location loc = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
         if (loc != null)
-            latLongView.setText(getString(R.string.latlong_format,
-                    loc.getLatitude(), loc.getLongitude()));
+            displayLocation(loc);
+    }
+
+    private void displayLocation(Location loc) {
+        latLongView.setText(getString(R.string.latlong_format,
+                loc.getLatitude(), loc.getLongitude()));
     }
 }
