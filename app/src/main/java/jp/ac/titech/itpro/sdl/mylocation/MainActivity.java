@@ -27,7 +27,10 @@ public class MainActivity extends AppCompatActivity implements
     private TextView latLongView;
     private GoogleApiClient googleApiClient;
     private LocationRequest locationRequest;
-    private boolean requestingLocationUpdate;
+
+    private enum UpdatingState {STOPPED, REQUESTING, STARTED}
+
+    private UpdatingState state = UpdatingState.STOPPED;
 
     private final static String[] PERMISSIONS = {
             Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -71,17 +74,17 @@ public class MainActivity extends AppCompatActivity implements
     protected void onResume() {
         Log.d(TAG, "onResume");
         super.onResume();
-        if (googleApiClient.isConnected())
+        if (state != UpdatingState.STARTED && googleApiClient.isConnected())
             startLocationUpdate(true);
         else
-            requestingLocationUpdate = true;
+            state = UpdatingState.REQUESTING;
     }
 
     @Override
     protected void onPause() {
         Log.d(TAG, "onPause");
-        stopLocationUpdate();
-        requestingLocationUpdate = false;
+        if (state == UpdatingState.STARTED)
+            stopLocationUpdate();
         super.onPause();
     }
 
@@ -95,7 +98,7 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     public void onConnected(@Nullable Bundle bundle) {
         Log.d(TAG, "onConnected");
-        if (requestingLocationUpdate)
+        if (state == UpdatingState.REQUESTING)
             startLocationUpdate(true);
     }
 
@@ -111,7 +114,7 @@ public class MainActivity extends AppCompatActivity implements
 
     @Override
     public void onLocationChanged(Location location) {
-        Log.d(TAG, "onLocationChanged");
+        Log.d(TAG, "onLocationChanged: " + location);
         displayLocation(location);
     }
 
@@ -127,6 +130,7 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     private void startLocationUpdate(boolean reqPermission) {
+        Log.d(TAG, "startLocationUpdate: " + reqPermission);
         for (String permission : PERMISSIONS) {
             if (ContextCompat.checkSelfPermission(this, permission)
                     != PackageManager.PERMISSION_GRANTED) {
@@ -139,10 +143,13 @@ public class MainActivity extends AppCompatActivity implements
             }
         }
         LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient, locationRequest, this);
+        state = UpdatingState.STARTED;
     }
 
     private void stopLocationUpdate() {
+        Log.d(TAG, "stopLocationUpdate");
         LocationServices.FusedLocationApi.removeLocationUpdates(googleApiClient, this);
+        state = UpdatingState.STOPPED;
     }
 
     private void displayLocation(Location loc) {
